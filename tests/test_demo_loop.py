@@ -111,6 +111,28 @@ class DemoLoopTests(unittest.TestCase):
         self.assertEqual(summary.frames, 1)
         self.assertIn("Stopped.", summary.messages)
 
+    def test_should_stop_ends_the_loop(self) -> None:
+        seen = {"frames": 0}
+
+        def should_stop() -> bool:
+            return seen["frames"] >= 1
+
+        def detect(frame: object) -> PoseObservation:
+            seen["frames"] += 1
+            return _observation(FrameStatus.UNKNOWN, "No pose landmarks in frame.")
+
+        summary = run_demo(
+            FakeCapture(["a", "b", "c"]),
+            detect,
+            lambda frame, observation, fps: frame,
+            max_frames=None,
+            max_consecutive_read_failures=5,
+            clock=Clock(),
+            should_stop=should_stop,
+        )
+        self.assertEqual(summary.frames, 1)
+        self.assertIn("Stopped.", summary.messages)
+
 
 if __name__ == "__main__":
     unittest.main()

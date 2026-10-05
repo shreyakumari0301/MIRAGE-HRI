@@ -2,4 +2,4 @@
 
 `hand_checked/` is a constructed 20-second trial with known answers. It is not a recording of a person.
 
-No participant video is stored here. A later protocol would be required before any consented recording is added.
+`PROTOCOL.md` is the consented-adult pilot protocol. `pilot/` is where those trials go. No participant video is stored here, and no confirmed trial has been recorded yet.

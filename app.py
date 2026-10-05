@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 from datetime import datetime, timezone
@@ -56,7 +57,13 @@ def _silence_opencv_logs(cv2_module: object) -> None:
         logging.setLogLevel(level)
 
 
-def run(settings: AppSettings, args: argparse.Namespace) -> int:
+def run(
+    settings: AppSettings,
+    args: argparse.Namespace,
+    *,
+    should_stop: Callable[[], bool] | None = None,
+    prompt: str | Callable[[], str] | None = None,
+) -> int:
     import cv2
 
     _silence_opencv_logs(cv2)
@@ -137,7 +144,7 @@ def run(settings: AppSettings, args: argparse.Namespace) -> int:
 
     def render(frame: object, observation: object, fps: float | None) -> object:
         prediction = latest.get("hand_raise")
-        return render_frame(
+        image = render_frame(
             frame,
             observation,
             min_visibility=settings.pose.min_landmark_visibility,
@@ -146,6 +153,20 @@ def run(settings: AppSettings, args: argparse.Namespace) -> int:
             robot_line=consumer.overlay_line,
             filter_line=latest.get("filter_line") if isinstance(latest.get("filter_line"), str) else None,
         )
+        line = prompt() if callable(prompt) else prompt
+        if line and getattr(image, "ndim", 0) == 3:
+            cv2.rectangle(image, (0, 0), (image.shape[1], 28), (20, 20, 20), -1)
+            cv2.putText(
+                image,
+                line[:90],
+                (8, 20),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (240, 240, 240),
+                1,
+                cv2.LINE_AA,
+            )
+        return image
 
     try:
         ensure_live_camera(capture, camera_index)
@@ -161,6 +182,7 @@ def run(settings: AppSettings, args: argparse.Namespace) -> int:
             max_consecutive_read_failures=settings.camera.max_consecutive_read_failures,
             show=None if args.headless else show,
             wait_key=None if args.headless else wait_key,
+            should_stop=should_stop,
         )
     finally:
         capture.release()

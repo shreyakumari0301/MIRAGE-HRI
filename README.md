@@ -2,7 +2,7 @@
 
 A laptop prototype that will turn webcam video into timestamped interaction events for a simulated robot consumer.
 
-**Status: Phase 5.** The webcam path emits filtered hand-raise events, and an offline scorer grades a hand-checked example. A live pilot has not been run. No general result is claimed.
+**Status: Phase 6.** The pilot protocol, held-out split, and report writer are in place. No confirmed adult trial is stored, so the pilot report claims no result.
 
 ## Research question
 
@@ -67,6 +67,16 @@ Score the hand-checked example. A detection counts as a match only when the even
 
 On this example the baseline precision is 2/62 and the mean delay is 0 ms. The filtered condition precision is 1 and the mean delay is 300 ms. Those figures describe the constructed example only.
 
+The pilot uses the same 1000 ms window and the same frozen filter (300 ms activation, 400 ms release, 500 ms cooldown). Held-out trials are the positive, no-cue, transition, distance, lighting, and occlusion conditions. `positive_tuning` is recorded and left out of the scores. The protocol is `data/PROTOCOL.md`. No video is saved.
+
+```powershell
+.\.venv\Scripts\python.exe -m evaluation.record_trial --participant P01 --condition positive --consent
+.\.venv\Scripts\python.exe -m evaluation.record_trial --confirm data\pilot\P01_positive
+.\.venv\Scripts\python.exe -m evaluation.pilot_report
+```
+
+`reports/pilot.md` scores only confirmed adult held-out trials. Until those trials exist, it says the result is not measured. That report is a pilot, not a general validation.
+
 ## Layout
 
 | Path | Phase 1 role |
@@ -85,11 +95,15 @@ On this example the baseline precision is 2/62 and the mean delay is 0 ms. The f
 | `evaluation/metrics.py` | Event precision, recall, F1, false triggers, and delay |
 | `evaluation/run_evaluation.py` | Score the hand-checked trial |
 | `data/hand_checked/` | Annotations and log with known answers |
-| `tests/` | Unit tests for pose status, the hand-raise rule, events, the filter, metrics, and the loop |
+| `data/PROTOCOL.md` | Consented-adult recording and annotation protocol |
+| `evaluation/pilot.py` | Held-out pilot report |
+| `evaluation/record_trial.py` | Record one trial without saving video |
+| `reports/pilot.md` | Pilot report generated from saved trials |
+| `tests/` | Unit tests for pose status, the hand-raise rule, events, the filter, metrics, the pilot gates, and the loop |
 
 The session log is `logs/session.jsonl`. Raw rows and filtered rows are both in that file. It is not committed.
 
-Planned and not built: pilot data collection and a pilot report.
+Planned and not built: portfolio packaging for a reviewer who was not in the room.
 
 ## Not in this version
 

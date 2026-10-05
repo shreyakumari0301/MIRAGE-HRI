@@ -108,6 +108,35 @@ def score_events(
     )
 
 
+def pool_scores(scores: list[EventScore], durations_ms: list[int]) -> EventScore:
+    """Sum true and false counts across trials. Delay is the mean of every match."""
+
+    if not scores or len(scores) != len(durations_ms):
+        raise ValueError("scores and durations_ms must be the same non-empty length")
+    if any(duration_ms <= 0 for duration_ms in durations_ms):
+        raise ValueError("duration_ms must be positive")
+    matches = tuple(pair for score in scores for pair in score.matches)
+    true_positives = sum(score.true_positives for score in scores)
+    false_positives = sum(score.false_positives for score in scores)
+    false_negatives = sum(score.false_negatives for score in scores)
+    precision = _ratio(true_positives, true_positives + false_positives)
+    recall = _ratio(true_positives, true_positives + false_negatives)
+    f1 = 0.0 if precision + recall == 0 else 2 * precision * recall / (precision + recall)
+    duration_ms = sum(durations_ms)
+    mean_delay = None if not matches else sum(pair.delay_ms for pair in matches) / len(matches)
+    return EventScore(
+        true_positives=true_positives,
+        false_positives=false_positives,
+        false_negatives=false_negatives,
+        precision=precision,
+        recall=recall,
+        f1=f1,
+        false_triggers_per_minute=false_positives / (duration_ms / 60_000),
+        mean_delay_ms=mean_delay,
+        matches=matches,
+    )
+
+
 def unknown_rate(unknown_frames: int, total_frames: int) -> float:
     return _ratio(unknown_frames, total_frames)
 

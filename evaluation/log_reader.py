@@ -52,3 +52,23 @@ def read_log(path: Path) -> LogCounts:
         baseline_ms=tuple(baseline),
         filtered_ms=tuple(filtered),
     )
+
+
+def stream_bounds_ms(path: Path) -> tuple[int, int] | None:
+    """First and last raw stream timestamps, or None when the log has no raw rows."""
+
+    first: int | None = None
+    last: int | None = None
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        row = json.loads(line)
+        if row.get("record") != "raw" or "stream_timestamp_ms" not in row:
+            continue
+        timestamp_ms = int(row["stream_timestamp_ms"])
+        if first is None:
+            first = timestamp_ms
+        last = timestamp_ms
+    if first is None or last is None:
+        return None
+    return first, last

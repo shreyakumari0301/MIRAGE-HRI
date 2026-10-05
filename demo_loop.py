@@ -49,6 +49,7 @@ def run_demo(
     show: ShowFn | None = None,
     wait_key: Callable[[], int] | None = None,
     clock: Callable[[], float] = time.perf_counter,
+    should_stop: Callable[[], bool] | None = None,
 ) -> LoopSummary:
     """Process frames until the user quits, the frame cap is hit, or the camera dies."""
 
@@ -61,6 +62,9 @@ def run_demo(
 
     try:
         while max_frames is None or summary.frames < max_frames:
+            if should_stop is not None and should_stop():
+                summary.messages.append("Stopped.")
+                break
             ok, frame = read_frame(capture)
             now = clock()
             dt = now - previous

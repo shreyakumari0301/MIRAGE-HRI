@@ -1,5 +1,5 @@
-# Phase 4: raw hand-raise labels, then one filtered gesture event for the robot.
-# Offline evaluation is not configured yet.
+# Hand-raise and filter values are frozen for the pilot.
+# Do not change them after looking at a pilot score.
 
 camera:
   index: 0
