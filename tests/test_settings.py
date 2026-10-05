@@ -25,6 +25,9 @@ class SettingsTests(unittest.TestCase):
             (ROOT / "models" / "pose_landmarker_lite.task").resolve(),
         )
         self.assertEqual(settings.pose.min_visible_landmarks, 8)
+        self.assertEqual(settings.hand_raise.raise_margin, 0.08)
+        self.assertEqual(settings.events.source, "webcam/hand_raise_rule")
+        self.assertEqual(settings.events.log_path, (ROOT / "logs" / "session.jsonl").resolve())
 
     def test_bad_backend_is_a_config_error(self) -> None:
         text = (ROOT / "config.yaml").read_text(encoding="utf-8")

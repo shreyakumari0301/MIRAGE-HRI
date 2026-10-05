@@ -1,1 +1,1 @@
-"""Phase 1 perception: webcam frames and body landmarks."""
+"""Perception: webcam frames, body landmarks, and the raw hand-raise rule."""

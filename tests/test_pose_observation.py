@@ -69,7 +69,7 @@ class ObservationTests(unittest.TestCase):
         self.assertIs(observation.status, FrameStatus.UNKNOWN)
         self.assertEqual(observation.visible_count, 0)
 
-    def test_non_finite_coordinates_are_dropped(self) -> None:
+    def test_non_finite_coordinates_keep_their_index_empty(self) -> None:
         points = _pose(visible=8)
         points.append(_point(float("nan"), 0.2, 0.99))
         observation = observation_from_landmarks(
@@ -77,7 +77,8 @@ class ObservationTests(unittest.TestCase):
         )
         self.assertIs(observation.status, FrameStatus.DETECTED)
         assert observation.landmarks is not None
-        self.assertEqual(len(observation.landmarks), 12)
+        self.assertEqual(len(observation.landmarks), 13)
+        self.assertIsNone(observation.landmarks[-1])
 
     def test_malformed_result_is_unavailable(self) -> None:
         observation = observation_from_result(

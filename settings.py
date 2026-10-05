@@ -32,9 +32,22 @@ class PoseSettings:
 
 
 @dataclass(frozen=True)
+class HandRaiseSettings:
+    raise_margin: float
+
+
+@dataclass(frozen=True)
+class EventSettings:
+    source: str
+    log_path: Path
+
+
+@dataclass(frozen=True)
 class AppSettings:
     camera: CameraSettings
     pose: PoseSettings
+    hand_raise: HandRaiseSettings
+    events: EventSettings
     window_name: str
 
 
@@ -65,6 +78,8 @@ def load_settings(path: Path) -> AppSettings:
 
     camera = _section(loaded, "camera")
     pose = _section(loaded, "pose")
+    hand_raise = _section(loaded, "hand_raise")
+    events = _section(loaded, "events")
     display = _section(loaded, "display")
     root = path.parent
 
@@ -78,6 +93,15 @@ def load_settings(path: Path) -> AppSettings:
         raise ConfigError("camera.backend must be 'dshow' or 'any'.")
 
     try:
+        raise_margin = float(_required(hand_raise, "raise_margin", "hand_raise"))
+        if raise_margin < 0:
+            raise ConfigError("hand_raise.raise_margin must be zero or positive.")
+        source = str(_required(events, "source", "events")).strip()
+        if not source:
+            raise ConfigError("events.source must not be empty.")
+        log_value = Path(str(_required(events, "log_path", "events")))
+        if not log_value.is_absolute():
+            log_value = (root / log_value).resolve()
         return AppSettings(
             camera=CameraSettings(
                 index=int(_required(camera, "index", "camera")),
@@ -107,6 +131,8 @@ def load_settings(path: Path) -> AppSettings:
                     _required(pose, "min_visible_landmarks", "pose")
                 ),
             ),
+            hand_raise=HandRaiseSettings(raise_margin=raise_margin),
+            events=EventSettings(source=source, log_path=log_value),
             window_name=str(_required(display, "window_name", "display")),
         )
     except (TypeError, ValueError) as exc:

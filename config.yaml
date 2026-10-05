@@ -1,5 +1,5 @@
-# Phase 1 only: webcam capture and pose landmarks.
-# Hand-raise detection, events, and evaluation are not configured yet.
+# Phase 3: raw hand-raise labels plus timestamped events for a simulated robot.
+# Temporal filtering and evaluation are not configured yet.
 
 camera:
   index: 0
@@ -19,6 +19,15 @@ pose:
   # A frame is "detected" only when at least this many landmarks clear the gate.
   min_landmark_visibility: 0.5
   min_visible_landmarks: 8
+
+hand_raise:
+  # Normalized image distance. y grows downward, so this is how far the wrist
+  # must sit above its shoulder. Visibility uses pose.min_landmark_visibility.
+  raise_margin: 0.08
+
+events:
+  source: webcam/hand_raise_rule
+  log_path: logs/session.jsonl
 
 display:
   window_name: MIRAGE-HRI

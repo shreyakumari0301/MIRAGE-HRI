@@ -42,7 +42,7 @@ class PoseObservation:
     """
 
     status: FrameStatus
-    landmarks: tuple[Landmark, ...] | None
+    landmarks: tuple[Landmark | None, ...] | None
     visible_count: int
     message: str
     timestamp_ms: int

@@ -1,6 +1,7 @@
-"""Phase 1 webcam demo: show body landmarks and a frame status.
+"""Webcam demo: landmarks, a raw hand-raise label, and robot events.
 
-Quit with q or Esc. This demo does not detect hand raises or emit events.
+Quit with q or Esc. Every raised frame is sent to the simulated robot.
+Duplicate triggers are not filtered yet.
 """
 
 from __future__ import annotations
@@ -9,16 +10,22 @@ import argparse
 import sys
 from pathlib import Path
 
+from datetime import datetime, timezone
+
 from demo_loop import ensure_live_camera, run_demo
+from events.consumer import RobotConsumer
+from events.log import JsonlLog
+from events.schema import build_interaction_event, raw_frame_record
 from perception.camera import open_camera
 from perception.draw import render_frame
 from perception.errors import MirageError
+from perception.hand_raise import HandRaiseLabel, HandRaisePrediction, predict_hand_raise
 from perception.pose_detector import PoseDetector
 from settings import AppSettings, load_settings
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="MIRAGE-HRI Phase 1 landmark demo")
+    parser = argparse.ArgumentParser(description="MIRAGE-HRI landmark and hand-raise demo")
     parser.add_argument(
         "--config",
         type=Path,
@@ -60,8 +67,19 @@ def run(settings: AppSettings, args: argparse.Namespace) -> int:
         settings.camera.backend,
         cv2_module=cv2,
     )
+    try:
+        log = JsonlLog(settings.events.log_path)
+    except OSError:
+        capture.release()
+        raise
     detector: PoseDetector | None = None
     window = settings.window_name
+    latest: dict[str, object] = {}
+    hand_counts = {label: 0 for label in HandRaiseLabel}
+    hand_messages: list[str] = []
+    last_hand_label: HandRaiseLabel | None = None
+    consumer = RobotConsumer()
+    clock = lambda: datetime.now(timezone.utc)
 
     def show(image: object) -> None:
         cv2.imshow(window, image)
@@ -69,12 +87,41 @@ def run(settings: AppSettings, args: argparse.Namespace) -> int:
     def wait_key() -> int:
         return int(cv2.waitKey(1) & 0xFF)
 
+    def detect(frame: object) -> object:
+        nonlocal last_hand_label
+        assert detector is not None
+        observation = detector.detect(frame)
+        prediction = predict_hand_raise(
+            observation.landmarks,
+            min_visibility=settings.pose.min_landmark_visibility,
+            raise_margin=settings.hand_raise.raise_margin,
+        )
+        latest["hand_raise"] = prediction
+        hand_counts[prediction.label] += 1
+        if prediction.label is not last_hand_label:
+            hand_messages.append(prediction.message)
+            last_hand_label = prediction.label
+        log.write(raw_frame_record(observation, prediction, clock=clock).to_dict())
+        event = build_interaction_event(
+            observation,
+            prediction,
+            source=settings.events.source,
+            clock=clock,
+        )
+        if event is not None:
+            log.write(event.to_dict())
+            consumer.receive(event)
+        return observation
+
     def render(frame: object, observation: object, fps: float | None) -> object:
+        prediction = latest.get("hand_raise")
         return render_frame(
             frame,
             observation,
             min_visibility=settings.pose.min_landmark_visibility,
             fps=fps,
+            hand_raise=prediction if isinstance(prediction, HandRaisePrediction) else None,
+            robot_line=consumer.overlay_line,
         )
 
     try:
@@ -90,7 +137,7 @@ def run(settings: AppSettings, args: argparse.Namespace) -> int:
         ensure_live_camera(capture, camera_index)
         summary = run_demo(
             capture,
-            detector.detect,
+            detect,
             render,
             max_frames=args.frames,
             max_consecutive_read_failures=settings.camera.max_consecutive_read_failures,
@@ -101,11 +148,21 @@ def run(settings: AppSettings, args: argparse.Namespace) -> int:
         capture.release()
         if detector is not None:
             detector.close()
+        log.close()
         if not args.headless:
             cv2.destroyAllWindows()
 
     for message in summary.messages:
         print(message)
+    for message in hand_messages:
+        print(message)
+    print(
+        "hand_raise "
+        f"raised={hand_counts[HandRaiseLabel.RAISED]} "
+        f"not_raised={hand_counts[HandRaiseLabel.NOT_RAISED]} "
+        f"insufficient={hand_counts[HandRaiseLabel.INSUFFICIENT]}"
+    )
+    print(f"robot_events={len(consumer.events)} log={log.path}")
     print(
         "summary "
         f"frames={summary.frames} "

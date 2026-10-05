@@ -2,7 +2,7 @@
 
 A laptop prototype that will turn webcam video into timestamped interaction events for a simulated robot consumer.
 
-**Status: Phase 1 only.** The webcam opens, body landmarks are drawn, and each frame is labeled `detected`, `unknown`, or `unavailable`. Hand-raise detection, temporal filtering, the robot consumer, and evaluation are not implemented. No measurements are claimed.
+**Status: Phase 3.** The webcam opens, each frame gets a raw `hand_raised` label, and a `detected` hand raise is sent as a timestamped event to a simulated robot. Temporal filtering and evaluation are not implemented. No measurements are claimed.
 
 ## Research question
 
@@ -10,7 +10,19 @@ Can temporal filtering and confidence-aware abstention improve the reliability o
 
 This repository does not answer that question yet.
 
-## What Phase 1 does
+## What this version does
+
+```text
+Webcam -> MediaPipe Pose landmarks -> raw hand_raised label -> JSON event -> simulated robot
+```
+
+The hand-raise label is still one frame at a time. A frame labeled `raised` becomes an event with status `detected`. `insufficient` becomes status `unknown`. A failed pose step becomes status `unavailable`. `not_raised` stays in the raw log and is not sent to the robot. `detector_score` is the wrist-to-shoulder clearance. It is named `uncalibrated_clearance` and is not a probability.
+
+Every raised frame is delivered. That is why a flickering hand produces many robot responses. The temporal filter that should collapse those into one event is not built yet.
+
+For each body side, the wrist and shoulder must both be visible inside the frame. Image y grows downward. That side is raised when `shoulder.y - wrist.y` is at least `hand_raise.raise_margin`. The frame is `raised` if either side is raised, `not_raised` if at least one side is usable and neither is raised, and `insufficient` when neither side is usable. "Left" and "right" are the person's sides in the pose model, not the left and right edges of the picture. The overlay prints those landmarks' visibility values. Visibility and the raise margin are not probabilities.
+
+## What Phase 1 still does
 
 ```text
 Webcam -> MediaPipe Pose landmarks -> on-screen status
@@ -56,12 +68,18 @@ The printed summary is a run log, not an evaluation result.
 | `app.py` | Webcam demo |
 | `config.yaml` | Camera, model, and visibility gate |
 | `perception/pose_detector.py` | Landmark inference and frame status |
+| `perception/hand_raise.py` | Raw wrist/shoulder hand-raise rule |
 | `perception/camera.py` | Open and read the webcam |
-| `perception/draw.py` | Draw landmarks that cleared the visibility gate |
+| `perception/draw.py` | Draw landmarks, visibility, the raw label, and the robot response |
+| `events/schema.py` | Timestamped event schema and raw-frame records |
+| `events/consumer.py` | Simulated robot. Responds only to status `detected` |
+| `events/log.py` | JSONL log of raw labels and events |
 | `demo_loop.py` | Keep running through unknown frames and short dropouts |
-| `tests/` | Unit tests for status, camera failure, and the loop |
+| `tests/` | Unit tests for pose status, the hand-raise rule, events, and the loop |
 
-Planned and not built: `hand_raised` detection, event schema, temporal filter, simulated robot consumer, offline evaluation, pilot report.
+The session log is `logs/session.jsonl`. It is not committed.
+
+Planned and not built: temporal filter, offline evaluation, pilot report.
 
 ## Not in this version
 

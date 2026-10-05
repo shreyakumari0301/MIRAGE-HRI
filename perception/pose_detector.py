@@ -1,7 +1,7 @@
 """MediaPipe Pose wrapper.
 
-Frame-level landmark results stay in this module. Hand-raise decisions and
-temporal events are later phases and are intentionally not implemented here.
+Frame-level landmark results stay in this module. The hand-raise rule reads
+those landmarks from ``perception.hand_raise`` and does not live here.
 """
 
 from __future__ import annotations
@@ -54,8 +54,9 @@ def observation_from_landmarks(
 
     ``detected`` requires at least ``min_visible_landmarks`` points whose
     model visibility is finite and at least ``min_visibility``. Fewer visible
-    points, or no pose at all, is ``unknown``. This function never fills in
-    missing points.
+    points, or no pose at all, is ``unknown``. A rejected point stays an empty
+    slot so later indexes still match the pose model. Missing points are not
+    replaced with guessed coordinates.
     """
 
     if not raw_landmarks:
@@ -67,14 +68,16 @@ def observation_from_landmarks(
             timestamp_ms=timestamp_ms,
         )
 
-    converted: list[Landmark] = []
+    converted: list[Landmark | None] = []
     visible_count = 0
     for raw in raw_landmarks:
         landmark = landmark_from_raw(raw)
-        if landmark is None:
-            continue
         converted.append(landmark)
-        if landmark.visibility is not None and landmark.visibility >= min_visibility:
+        if (
+            landmark is not None
+            and landmark.visibility is not None
+            and landmark.visibility >= min_visibility
+        ):
             visible_count += 1
 
     landmarks = tuple(converted)

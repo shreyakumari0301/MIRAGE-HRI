@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from perception.hand_raise import HandRaiseLabel, HandRaisePrediction, visibility_line
 from perception.status import FrameStatus, Landmark, PoseObservation
 
 # Standard 33-point MediaPipe pose topology, used only for display.
@@ -65,12 +66,32 @@ def _pixel(landmark: Landmark, width: int, height: int) -> tuple[int, int]:
     return int(landmark.x * width), int(landmark.y * height)
 
 
+_HAND_COLOR = {
+    HandRaiseLabel.RAISED: (60, 170, 60),
+    HandRaiseLabel.NOT_RAISED: (220, 220, 220),
+    HandRaiseLabel.INSUFFICIENT: (0, 180, 220),
+}
+
+
+def _mark_side(canvas: Any, points: dict[int, tuple[int, int]], prediction: HandRaisePrediction) -> None:
+    import cv2
+
+    for side in prediction.sides:
+        if not side.raised:
+            continue
+        for index in (side.wrist_index, side.shoulder_index):
+            if index in points:
+                cv2.circle(canvas, points[index], 8, (60, 220, 60), 2, cv2.LINE_AA)
+
+
 def render_frame(
     frame_bgr: Any,
     observation: PoseObservation,
     *,
     min_visibility: float,
     fps: float | None = None,
+    hand_raise: HandRaisePrediction | None = None,
+    robot_line: str | None = None,
 ) -> Any:
     """Draw usable landmarks and a status banner. The input frame is copied."""
 
@@ -81,7 +102,7 @@ def render_frame(
     landmarks = observation.landmarks or ()
     points: dict[int, tuple[int, int]] = {}
     for index, landmark in enumerate(landmarks):
-        if _visible(landmark, min_visibility):
+        if landmark is not None and _visible(landmark, min_visibility):
             points[index] = _pixel(landmark, width, height)
 
     for start, end in POSE_CONNECTIONS:
@@ -89,21 +110,34 @@ def render_frame(
             cv2.line(canvas, points[start], points[end], (255, 180, 40), 2, cv2.LINE_AA)
     for point in points.values():
         cv2.circle(canvas, point, 3, (40, 220, 255), -1, cv2.LINE_AA)
+    if hand_raise is not None:
+        _mark_side(canvas, points, hand_raise)
 
     color = _STATUS_COLOR[observation.status]
     banner = f"{observation.status.value}: {observation.message}"
     if fps is not None:
         banner = f"{banner}  fps {fps:.1f}"
-    top = max(height - 36, 0)
+    lines = [banner]
+    line_colors = [color]
+    if hand_raise is not None:
+        lines.append(visibility_line(hand_raise))
+        line_colors.append(_HAND_COLOR[hand_raise.label])
+    if robot_line:
+        lines.append(robot_line)
+        line_colors.append((220, 220, 220))
+    banner_height = 22 + 18 * len(lines)
+    top = max(height - banner_height, 0)
     cv2.rectangle(canvas, (0, top), (width, height), (20, 20, 20), -1)
-    cv2.putText(
-        canvas,
-        banner,
-        (8, min(height - 12, height - 4)),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.5,
-        color,
-        1,
-        cv2.LINE_AA,
-    )
+    for offset, (text, text_color) in enumerate(zip(lines, line_colors)):
+        baseline = min(top + 18 + 18 * offset, height - 4)
+        cv2.putText(
+            canvas,
+            text,
+            (8, baseline),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.45,
+            text_color,
+            1,
+            cv2.LINE_AA,
+        )
     return canvas
