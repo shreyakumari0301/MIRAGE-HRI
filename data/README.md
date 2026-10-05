@@ -1,7 +1,5 @@
 # Data
 
-No recordings or annotations are stored here yet.
+`hand_checked/` is a constructed 20-second trial with known answers. It is not a recording of a person.
 
-Phase 6 will add a protocol for consented adult participants and a place for
-trial logs. Do not put participant video in this folder until that protocol
-exists.
+No participant video is stored here. A later protocol would be required before any consented recording is added.

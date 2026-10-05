@@ -1,0 +1,12 @@
+# Hand-checked trial. The 1000 ms tolerance was chosen before scoring.
+# A prediction matches an annotated raise only if it is emitted within
+# 1000 ms of the annotated start. Each side of a match is used once.
+trial_id: hand_checked
+duration_ms: 20000
+tolerance_ms: 1000
+cue: hand_raised
+events:
+  - start_ms: 1000
+    end_ms: 4000
+  - start_ms: 10000
+    end_ms: 13000

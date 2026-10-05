@@ -2,7 +2,7 @@
 
 A laptop prototype that will turn webcam video into timestamped interaction events for a simulated robot consumer.
 
-**Status: Phase 4.** The webcam opens, each frame gets a raw `hand_raised` label, and a temporal filter sends one gesture event to a simulated robot after the raise has held. Offline evaluation is not implemented. No measurements are claimed.
+**Status: Phase 5.** The webcam path emits filtered hand-raise events, and an offline scorer grades a hand-checked example. A live pilot has not been run. No general result is claimed.
 
 ## Research question
 
@@ -59,6 +59,14 @@ Check a fixed number of frames without a window:
 
 The printed summary is a run log, not an evaluation result.
 
+Score the hand-checked example. A detection counts as a match only when the event is emitted within **1000 ms** of the annotated start. That window was chosen before the scores below were calculated, and the same window is used for the raw baseline and the filtered events. Each annotation and each prediction can match only once, so a second prediction in the same window is a false trigger. The baseline treats every raw `raised` frame as its own event. The filtered condition uses the gesture-start events.
+
+```powershell
+.\.venv\Scripts\python.exe evaluation\run_evaluation.py
+```
+
+On this example the baseline precision is 2/62 and the mean delay is 0 ms. The filtered condition precision is 1 and the mean delay is 300 ms. Those figures describe the constructed example only.
+
 ## Layout
 
 | Path | Phase 1 role |
@@ -74,11 +82,14 @@ The printed summary is a run log, not an evaluation result.
 | `events/log.py` | JSONL log of raw labels and filtered events |
 | `events/temporal_filter.py` | Activation, release, and cooldown for one gesture |
 | `demo_loop.py` | Keep running through unknown frames and short dropouts |
-| `tests/` | Unit tests for pose status, the hand-raise rule, events, the filter, and the loop |
+| `evaluation/metrics.py` | Event precision, recall, F1, false triggers, and delay |
+| `evaluation/run_evaluation.py` | Score the hand-checked trial |
+| `data/hand_checked/` | Annotations and log with known answers |
+| `tests/` | Unit tests for pose status, the hand-raise rule, events, the filter, metrics, and the loop |
 
 The session log is `logs/session.jsonl`. Raw rows and filtered rows are both in that file. It is not committed.
 
-Planned and not built: offline evaluation, pilot report.
+Planned and not built: pilot data collection and a pilot report.
 
 ## Not in this version
 
