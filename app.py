@@ -1,7 +1,7 @@
-"""Webcam demo: landmarks, a raw hand-raise label, and robot events.
+"""Webcam demo: landmarks, raw hand-raise labels, and filtered robot events.
 
-Quit with q or Esc. Every raised frame is sent to the simulated robot.
-Duplicate triggers are not filtered yet.
+Quit with q or Esc. The robot hears one event after a raise has held still,
+not one event per raised frame.
 """
 
 from __future__ import annotations
@@ -15,7 +15,8 @@ from datetime import datetime, timezone
 from demo_loop import ensure_live_camera, run_demo
 from events.consumer import RobotConsumer
 from events.log import JsonlLog
-from events.schema import build_interaction_event, raw_frame_record
+from events.schema import raw_frame_record
+from events.temporal_filter import TemporalFilter
 from perception.camera import open_camera
 from perception.draw import render_frame
 from perception.errors import MirageError
@@ -60,25 +61,43 @@ def run(settings: AppSettings, args: argparse.Namespace) -> int:
 
     _silence_opencv_logs(cv2)
     camera_index = settings.camera.index if args.camera is None else args.camera
-    capture = open_camera(
-        camera_index,
-        settings.camera.width,
-        settings.camera.height,
-        settings.camera.backend,
-        cv2_module=cv2,
+    print("Loading the pose model. This takes a few seconds...", flush=True)
+    detector = PoseDetector(
+        settings.pose.model_path,
+        num_poses=settings.pose.num_poses,
+        min_pose_detection_confidence=settings.pose.min_pose_detection_confidence,
+        min_pose_presence_confidence=settings.pose.min_pose_presence_confidence,
+        min_tracking_confidence=settings.pose.min_tracking_confidence,
+        min_landmark_visibility=settings.pose.min_landmark_visibility,
+        min_visible_landmarks=settings.pose.min_visible_landmarks,
     )
+    print(f"Opening camera {camera_index}...", flush=True)
+    capture = None
     try:
+        capture = open_camera(
+            camera_index,
+            settings.camera.width,
+            settings.camera.height,
+            settings.camera.backend,
+            cv2_module=cv2,
+        )
         log = JsonlLog(settings.events.log_path)
-    except OSError:
-        capture.release()
+    except Exception:
+        if capture is not None:
+            capture.release()
+        detector.close()
         raise
-    detector: PoseDetector | None = None
     window = settings.window_name
     latest: dict[str, object] = {}
     hand_counts = {label: 0 for label in HandRaiseLabel}
     hand_messages: list[str] = []
     last_hand_label: HandRaiseLabel | None = None
     consumer = RobotConsumer()
+    gesture = TemporalFilter(
+        settings.filter.activation_ms,
+        settings.filter.release_ms,
+        settings.filter.cooldown_ms,
+    )
     clock = lambda: datetime.now(timezone.utc)
 
     def show(image: object) -> None:
@@ -102,15 +121,18 @@ def run(settings: AppSettings, args: argparse.Namespace) -> int:
             hand_messages.append(prediction.message)
             last_hand_label = prediction.label
         log.write(raw_frame_record(observation, prediction, clock=clock).to_dict())
-        event = build_interaction_event(
+        update = gesture.update(
             observation,
             prediction,
             source=settings.events.source,
             clock=clock,
         )
-        if event is not None:
-            log.write(event.to_dict())
-            consumer.receive(event)
+        latest["filter_line"] = update.overlay
+        filtered = update.to_log()
+        if filtered is not None:
+            log.write(filtered)
+        if update.event is not None:
+            consumer.receive(update.event)
         return observation
 
     def render(frame: object, observation: object, fps: float | None) -> object:
@@ -122,19 +144,15 @@ def run(settings: AppSettings, args: argparse.Namespace) -> int:
             fps=fps,
             hand_raise=prediction if isinstance(prediction, HandRaisePrediction) else None,
             robot_line=consumer.overlay_line,
+            filter_line=latest.get("filter_line") if isinstance(latest.get("filter_line"), str) else None,
         )
 
     try:
-        detector = PoseDetector(
-            settings.pose.model_path,
-            num_poses=settings.pose.num_poses,
-            min_pose_detection_confidence=settings.pose.min_pose_detection_confidence,
-            min_pose_presence_confidence=settings.pose.min_pose_presence_confidence,
-            min_tracking_confidence=settings.pose.min_tracking_confidence,
-            min_landmark_visibility=settings.pose.min_landmark_visibility,
-            min_visible_landmarks=settings.pose.min_visible_landmarks,
-        )
         ensure_live_camera(capture, camera_index)
+        print(
+            "Running. The MIRAGE-HRI window is the live view. Click it and press q to quit.",
+            flush=True,
+        )
         summary = run_demo(
             capture,
             detect,
@@ -146,8 +164,7 @@ def run(settings: AppSettings, args: argparse.Namespace) -> int:
         )
     finally:
         capture.release()
-        if detector is not None:
-            detector.close()
+        detector.close()
         log.close()
         if not args.headless:
             cv2.destroyAllWindows()

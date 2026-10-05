@@ -2,7 +2,7 @@
 
 A laptop prototype that will turn webcam video into timestamped interaction events for a simulated robot consumer.
 
-**Status: Phase 3.** The webcam opens, each frame gets a raw `hand_raised` label, and a `detected` hand raise is sent as a timestamped event to a simulated robot. Temporal filtering and evaluation are not implemented. No measurements are claimed.
+**Status: Phase 4.** The webcam opens, each frame gets a raw `hand_raised` label, and a temporal filter sends one gesture event to a simulated robot after the raise has held. Offline evaluation is not implemented. No measurements are claimed.
 
 ## Research question
 
@@ -16,9 +16,7 @@ This repository does not answer that question yet.
 Webcam -> MediaPipe Pose landmarks -> raw hand_raised label -> JSON event -> simulated robot
 ```
 
-The hand-raise label is still one frame at a time. A frame labeled `raised` becomes an event with status `detected`. `insufficient` becomes status `unknown`. A failed pose step becomes status `unavailable`. `not_raised` stays in the raw log and is not sent to the robot. `detector_score` is the wrist-to-shoulder clearance. It is named `uncalibrated_clearance` and is not a probability.
-
-Every raised frame is delivered. That is why a flickering hand produces many robot responses. The temporal filter that should collapse those into one event is not built yet.
+The hand-raise label is still computed one frame at a time and written to the log as a raw record. The robot does not hear those frames directly. A raise must stay `raised` for `filter.activation_ms` before a start event is sent. Any other label cancels that wait. The gesture ends after a non-raised label lasts `filter.release_ms`, and new raises are ignored for `filter.cooldown_ms` after that. `delay_ms` on the filtered start record is the wait from the first frame of the run that succeeded. `detector_score` remains the uncalibrated wrist-to-shoulder clearance.
 
 For each body side, the wrist and shoulder must both be visible inside the frame. Image y grows downward. That side is raised when `shoulder.y - wrist.y` is at least `hand_raise.raise_margin`. The frame is `raised` if either side is raised, `not_raised` if at least one side is usable and neither is raised, and `insufficient` when neither side is usable. "Left" and "right" are the person's sides in the pose model, not the left and right edges of the picture. The overlay prints those landmarks' visibility values. Visibility and the raise margin are not probabilities.
 
@@ -73,13 +71,14 @@ The printed summary is a run log, not an evaluation result.
 | `perception/draw.py` | Draw landmarks, visibility, the raw label, and the robot response |
 | `events/schema.py` | Timestamped event schema and raw-frame records |
 | `events/consumer.py` | Simulated robot. Responds only to status `detected` |
-| `events/log.py` | JSONL log of raw labels and events |
+| `events/log.py` | JSONL log of raw labels and filtered events |
+| `events/temporal_filter.py` | Activation, release, and cooldown for one gesture |
 | `demo_loop.py` | Keep running through unknown frames and short dropouts |
-| `tests/` | Unit tests for pose status, the hand-raise rule, events, and the loop |
+| `tests/` | Unit tests for pose status, the hand-raise rule, events, the filter, and the loop |
 
-The session log is `logs/session.jsonl`. It is not committed.
+The session log is `logs/session.jsonl`. Raw rows and filtered rows are both in that file. It is not committed.
 
-Planned and not built: temporal filter, offline evaluation, pilot report.
+Planned and not built: offline evaluation, pilot report.
 
 ## Not in this version
 

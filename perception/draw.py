@@ -92,6 +92,7 @@ def render_frame(
     fps: float | None = None,
     hand_raise: HandRaisePrediction | None = None,
     robot_line: str | None = None,
+    filter_line: str | None = None,
 ) -> Any:
     """Draw usable landmarks and a status banner. The input frame is copied."""
 
@@ -122,6 +123,9 @@ def render_frame(
     if hand_raise is not None:
         lines.append(visibility_line(hand_raise))
         line_colors.append(_HAND_COLOR[hand_raise.label])
+    if filter_line:
+        lines.append(filter_line)
+        line_colors.append((180, 180, 180))
     if robot_line:
         lines.append(robot_line)
         line_colors.append((220, 220, 220))

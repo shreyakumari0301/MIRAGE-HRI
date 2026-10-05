@@ -48,10 +48,13 @@ def open_camera(
 
     Raises ``CameraUnavailableError`` when the device cannot be opened.
     The capture is released before that exception is raised.
+    Open and read stay on the calling thread. DirectShow hangs on read
+    if the device was opened on another thread.
     """
 
+    flag = backend_flag(backend, cv2_module)
     opener = factory or cv2_module.VideoCapture
-    capture = opener(index, backend_flag(backend, cv2_module))
+    capture = opener(index, flag)
     if not capture.isOpened():
         capture.release()
         raise CameraUnavailableError(

@@ -27,6 +27,9 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(settings.pose.min_visible_landmarks, 8)
         self.assertEqual(settings.hand_raise.raise_margin, 0.08)
         self.assertEqual(settings.events.source, "webcam/hand_raise_rule")
+        self.assertEqual(settings.filter.activation_ms, 300)
+        self.assertEqual(settings.filter.release_ms, 400)
+        self.assertEqual(settings.filter.cooldown_ms, 500)
         self.assertEqual(settings.events.log_path, (ROOT / "logs" / "session.jsonl").resolve())
 
     def test_bad_backend_is_a_config_error(self) -> None:

@@ -1,5 +1,5 @@
-# Phase 3: raw hand-raise labels plus timestamped events for a simulated robot.
-# Temporal filtering and evaluation are not configured yet.
+# Phase 4: raw hand-raise labels, then one filtered gesture event for the robot.
+# Offline evaluation is not configured yet.
 
 camera:
   index: 0
@@ -28,6 +28,14 @@ hand_raise:
 events:
   source: webcam/hand_raise_rule
   log_path: logs/session.jsonl
+
+filter:
+  # Stream-clock milliseconds. A raise must hold this long before the robot hears it.
+  activation_ms: 300
+  # How long a non-raised label must last before the gesture ends.
+  release_ms: 400
+  # Ignore new raises for this long after a gesture ends.
+  cooldown_ms: 500
 
 display:
   window_name: MIRAGE-HRI

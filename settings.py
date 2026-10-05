@@ -43,11 +43,19 @@ class EventSettings:
 
 
 @dataclass(frozen=True)
+class FilterSettings:
+    activation_ms: int
+    release_ms: int
+    cooldown_ms: int
+
+
+@dataclass(frozen=True)
 class AppSettings:
     camera: CameraSettings
     pose: PoseSettings
     hand_raise: HandRaiseSettings
     events: EventSettings
+    filter: FilterSettings
     window_name: str
 
 
@@ -80,6 +88,7 @@ def load_settings(path: Path) -> AppSettings:
     pose = _section(loaded, "pose")
     hand_raise = _section(loaded, "hand_raise")
     events = _section(loaded, "events")
+    filtered = _section(loaded, "filter")
     display = _section(loaded, "display")
     root = path.parent
 
@@ -102,6 +111,11 @@ def load_settings(path: Path) -> AppSettings:
         log_value = Path(str(_required(events, "log_path", "events")))
         if not log_value.is_absolute():
             log_value = (root / log_value).resolve()
+        activation_ms = int(_required(filtered, "activation_ms", "filter"))
+        release_ms = int(_required(filtered, "release_ms", "filter"))
+        cooldown_ms = int(_required(filtered, "cooldown_ms", "filter"))
+        if min(activation_ms, release_ms, cooldown_ms) < 0:
+            raise ConfigError("filter durations must be zero or positive.")
         return AppSettings(
             camera=CameraSettings(
                 index=int(_required(camera, "index", "camera")),
@@ -133,6 +147,11 @@ def load_settings(path: Path) -> AppSettings:
             ),
             hand_raise=HandRaiseSettings(raise_margin=raise_margin),
             events=EventSettings(source=source, log_path=log_value),
+            filter=FilterSettings(
+                activation_ms=activation_ms,
+                release_ms=release_ms,
+                cooldown_ms=cooldown_ms,
+            ),
             window_name=str(_required(display, "window_name", "display")),
         )
     except (TypeError, ValueError) as exc:
