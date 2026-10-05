@@ -1,0 +1,8 @@
+# Phase 1 runtime dependencies, pinned to the versions exercised on this machine.
+# MediaPipe 1.0.1 publishes a Windows py3 wheel and does not pin numpy<2.
+# Do not also install opencv-python. MediaPipe uses opencv-contrib-python,
+# and installing both OpenCV packages often breaks cv2.
+mediapipe==1.0.1
+opencv-contrib-python==5.0.0.93
+numpy==2.5.3
+PyYAML==6.0.3
